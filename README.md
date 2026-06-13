@@ -1,140 +1,124 @@
-# Claude Code Experiments
+# Photo Atlas
 
-This repository contains various coding experiments and projects created with the assistance of Claude AI. Each branch represents a different experiment or project, showcasing different technologies, frameworks, and use cases.
+Navigate years of photos by **who's in them**, **what they show**, **where**
+and **when** — with a modern deep-learning face pipeline, offline reverse
+geocoding, automatic scene tagging and a clean web UI.
 
-## Branches
+Point it at a folder (or 15 years of folders), let it build a catalog, then
+browse and filter your library and put names to faces. New imports are
+recognised automatically once a person has been named.
 
-### Claude Experiments
+![pipeline](https://img.shields.io/badge/faces-YuNet%20%2B%20SFace-4c8dff) ![offline](https://img.shields.io/badge/geocoding-offline-2ea043)
 
-#### `claude/basketball-shot-chart-BvXWV`
+---
 
-A Python package for generating NBA-style hexbin shot charts, similar to those popularized by Kirk Goldsberry. Features include:
+## Features
 
-- Hexbin visualization of shot data
-- Support for NBA API data fetching or synthetic demo data
-- Customizable gridsize, color modes, and minimum shots per hex
-- Output to PNG files
+- **Deep face recognition** — OpenCV's [YuNet](https://github.com/opencv/opencv_zoo)
+  detector + [SFace](https://github.com/opencv/opencv_zoo) 128-d embeddings.
+  On real photos same-person pairs sit at ~0.05 cosine distance and different
+  people at ~0.9, so identities separate cleanly.
+- **Name people once** — unrecognised faces are grouped into clusters; name a
+  cluster and every matching photo becomes filterable. Future imports are
+  auto-recognised against the people you've named.
+- **Filter by anything** — person, scene type (`people` / `landscape` / `food` /
+  `document` / `other`), country, city, year, camera, or filename — combined.
+- **Offline reverse geocoding** — GPS EXIF → city + country using a bundled
+  dataset (no network). Install `reverse_geocoder` for ~150k-city resolution.
+- **Rich metadata** — capture date (EXIF, with file-mtime fallback), camera,
+  dimensions, GPS, thumbnails.
+- **Web UI** — gallery with lazy thumbnails, a detail lightbox, a People page
+  and a "Name faces" workflow. No build step (vanilla JS).
+- **Everything local** — a single SQLite catalog plus thumbnails/face crops
+  under `~/.photo_atlas`. Your photos never leave your machine.
 
-**Tech Stack:** Python, Matplotlib, NumPy, Pandas, NBA API (optional)
+## Install
 
-#### `claude/expense-tracker-app-H7R8o`
+```bash
+pip install -e .            # core app (Pillow, scikit-learn, OpenCV, FastAPI…)
+pip install -e '.[dev]'     # + test tooling
+pip install -e '.[dlib]'    # optional: face_recognition (dlib) backend
+pip install -e '.[geo]'     # optional: high-resolution reverse geocoding
+```
 
-A modern, responsive Progressive Web App for personal finance tracking. Built as a PWA with offline-first architecture.
+The YuNet + SFace ONNX weights (~38 MB) are downloaded on first use to
+`~/.photo_atlas/models`. For offline/air-gapped setups, point
+`PHOTO_ATLAS_YUNET` / `PHOTO_ATLAS_SFACE` at local model files.
 
-- Manual transaction entry and receipt scanning with OCR
-- Smart category detection and multi-currency support
-- Analytics dashboard with charts and spending predictions
-- Budget setting with progress tracking
-- Export/import functionality
-- Dark mode and PWA installation support
+## Try it in 30 seconds
 
-**Tech Stack:** React, TypeScript, Vite, Tailwind CSS, Tesseract.js, Recharts, Workbox
+```bash
+photo-atlas demo      # paint & index a synthetic, geotagged library
+photo-atlas serve     # open http://127.0.0.1:8000
+```
 
-#### `claude/file-conversion-cli-DczKJ`
+The demo creates cartoon photos with EXIF dates spread across 2010–2024, GPS
+near real cities, and three recurring "people" so you can exercise filtering,
+clustering and naming without any real photos.
 
-A fast, zero-configuration CLI tool for converting files between various formats. Supports images, documents, data files, and videos.
+## Use it on your photos
 
-- Single file and batch directory conversions
-- Image formats: PNG, JPG, WebP, BMP, GIF, TIFF, ICO, HEIC/HEIF
-- Document formats: Markdown to HTML/PDF/DocX, HTML to PDF
-- Data formats: CSV, JSON, YAML, XLSX, TSV conversions
-- Video formats: MP4, AVI, MKV, MOV, WebM, FLV, WMV, M4V, TS
-- Quality and resize options
+```bash
+photo-atlas index ~/Pictures        # walk the tree, extract metadata + faces
+photo-atlas cluster                 # group the unnamed faces
+photo-atlas serve                   # browse, filter, and name people
+photo-atlas stats                   # quick catalog summary
+```
 
-**Tech Stack:** Python, Click, Pillow, Pandoc, OpenPyXL, PyYAML, ffmpeg
+`index` is incremental — already-known photos are skipped (use `--recompute` to
+force). Choose the face backend with `--faces {auto,yunet,dlib,synthetic,none}`
+(default `auto` → YuNet/SFace).
 
-#### `claude/flight-price-monitor-b4vhp`
+## How it works
 
-A comprehensive flight price monitoring system focused on routes from Basque Country airports (BIO, EAS, VIT) to European and transatlantic destinations.
+```
+indexer ─┬─ metadata.py   EXIF date / camera / GPS  + thumbnails
+         ├─ geocode.py    GPS → city, country (offline nearest-city)
+         ├─ faces.py      YuNet detect → SFace embed → DBSCAN cluster
+         ├─ classify.py   colour/face heuristics → scene tag
+         └─ db.py         SQLite catalog (photos / persons / faces)
 
-- Multi-provider support: Kiwi Tequila API, Amadeus, Google Flights via SerpAPI
-- Smart deal detection comparing current prices to historical averages
-- Flexible date searches and cabin bag filtering
-- Watch mode for specific routes with price drop alerts
-- Web dashboard with price trend charts
-- Telegram notifications and email reports
-- SQLite database for historical price tracking
+api.py (FastAPI)  →  web/  (gallery · filters · people · name-faces)
+```
 
-**Tech Stack:** Python, Flask, Chart.js, SQLite, Telegram Bot API, SMTP
+- **Recognition.** Each named person gets an averaged "centroid" embedding. When
+  new photos are indexed, every detected face within
+  `face_match_threshold` cosine distance of a centroid is auto-assigned.
+- **Clustering.** Unnamed faces are grouped with DBSCAN over cosine distance
+  (`cluster_eps`, `cluster_min_samples`) so you can name a whole group at once.
+- **Tunables** live in `photo_atlas.config.AtlasConfig`.
 
-#### `claude/holiday-blog-2pgUJ`
+## API
 
-A full-stack personal travel blog application with AI-powered insights and optional Office 365 integration.
+`photo-atlas serve` exposes a small JSON API (see `src/photo_atlas/api.py`):
 
-- Travel documentation with photo galleries and interactive maps
-- AI analysis for restaurants, recommendations, and highlights extraction
-- Search and filtering by destination, favorites, timeline view
-- OneNote and OneDrive integration for importing content
-- JWT-based admin authentication
-- Responsive design with Docker deployment options
+| Method & path | Purpose |
+| --- | --- |
+| `GET /api/facets` | counts for the filter sidebar |
+| `GET /api/photos?person_id=&scene=&country=&city=&year=&camera=&q=` | filtered list |
+| `GET /api/photos/{id}` | photo detail + faces |
+| `GET /api/image\|thumb/{id}`, `GET /api/face/{id}` | media |
+| `GET /api/persons`, `PATCH/DELETE /api/persons/{id}` | manage people |
+| `GET /api/clusters`, `POST /api/clusters/{id}/assign` | name a face group |
+| `POST /api/faces/{id}/assign` | name a single face |
 
-**Tech Stack:** Node.js, Express, React, TypeScript, MongoDB, OpenAI API, Microsoft Graph API, Leaflet, Docker
+## Tests
 
-#### `claude/personal-website-design-utqZY`
+```bash
+pytest                            # offline suite (deterministic, no network)
+pytest tests/test_deep_faces.py   # deep YuNet/SFace test on real faces*
+```
 
-A modern, responsive personal website for Stefano Masneri, Senior AI Engineer. Features include:
+\* downloads the models + a few public sample faces; **skips** (never fails)
+when offline. It asserts the deep model puts the same person far closer than two
+different people, and that clustering groups repeat photos of one identity.
 
-- Interactive neural network visualization with Three.js
-- Sections for about, research, publications, skills, blog, and contact
-- Responsive design with smooth scrolling navigation
-- Auto-geocoding and globe visualization
-- Test suite for functionality
+## Notes
 
-**Tech Stack:** HTML, CSS, JavaScript, Three.js, Leaflet
-
-#### `claude/serie-a-predictor-nZVj4`
-
-A football match prediction engine for Serie A, Premier League, La Liga, and Bundesliga using statistical modeling.
-
-- Poisson distribution model with Dixon-Coles correction
-- Expected Goals (xG) data integration from Understat
-- Live bookmaker odds integration via The Odds API
-- Value bet detection using expected value calculations
-- Kelly Criterion stake sizing
-- Multi-league support with team form and head-to-head statistics
-- Web interface with best bets panel
-
-**Tech Stack:** Python, Flask, HTML, CSS, JavaScript, football-data.org API, The Odds API, Understat
-
-### Codex Experiments
-
-#### `codex/create-image-classifications-branch-and-scripts`
-
-Image classification and face recognition pipelines using machine learning.
-
-- Image classification into categories: food, landscapes, people
-- Multi-label face recognition (identifying multiple people in one image)
-- Training scripts for custom classifiers
-- Zero-shot classification using CLIP
-- FastAPI web API for inference
-- Face embedding enrollment and prediction
-
-**Tech Stack:** Python, FastAPI, scikit-learn, CLIP, face_recognition, Uvicorn
-
-## Getting Started
-
-Each experiment is contained in its own branch. To explore a specific project:
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/Stocastico/Claude-code-experiments.git
-   cd Claude-code-experiments
-   ```
-
-2. Switch to the desired branch:
-
-   ```bash
-   git checkout <branch-name>
-   ```
-
-3. Follow the setup instructions in the branch's README.md file.
-
-## Contributing
-
-This repository serves as a collection of experimental projects. Each branch is self-contained and may have its own contribution guidelines.
-
-## License
-
-See LICENSE file for details.</content>
-<parameter name="filePath">/Users/fasteno/Documents/CODE/Claude-code-experiments/README.md
+- Built and verified with `opencv-python 4.13`, which already ships the DNN face
+  module (`FaceDetectorYN` / `FaceRecognizerSF`). OpenCV 5 wheels were not yet on
+  PyPI at the time of writing; the code targets `opencv>=4.10` and is forward
+  compatible.
+- The original `image_classifications` package (trainable scene classifier +
+  multi-label face service, FastAPI) is retained under `src/image_classifications`
+  and `scripts/`; Photo Atlas is the application built on top of those ideas.
