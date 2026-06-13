@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Photo Atlas</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Photo<span class="dot">·</span>Atlas</h1>
+    <div class="tabbar">
+      <button class="tab active" data-view="photos">Photos</button>
+      <button class="tab" data-view="people">People</button>
+      <button class="tab" data-view="clusters">Name faces</button>
+    </div>
+    <div class="spacer"></div>
+    <input id="search" placeholder="Search filename…" />
+  </header>
+
+  <div class="layout">
+    <aside id="sidebar"></aside>
+    <main>
+      <div id="view-photos">
+        <div class="toolbar">
+          <span id="result-count">—</span>
+          <div class="spacer" style="flex:1"></div>
+          <label>Sort
+            <select id="sort">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
+        </div>
+        <div id="grid" class="grid"></div>
+        <div id="grid-empty" class="empty" style="display:none">No photos match these filters.</div>
+      </div>
+
+      <div id="view-people" style="display:none">
+        <div id="people" class="people-grid"></div>
+        <div id="people-empty" class="empty" style="display:none">No one named yet. Use “Name faces”.</div>
+      </div>
+
+      <div id="view-clusters" style="display:none">
+        <p class="tagline">Groups of unrecognised faces. Give a group a name and every photo with that
+          person becomes filterable — new imports are recognised automatically.</p>
+        <div id="clusters" class="cluster-grid"></div>
+        <div id="clusters-empty" class="empty" style="display:none">No unnamed clusters. Run <code>photo-atlas cluster</code>.</div>
+      </div>
+    </main>
+  </div>
+
+  <div class="lightbox" id="lightbox">
+    <span class="close" id="lb-close">&times;</span>
+    <div class="lb-inner">
+      <div class="lb-img"><img id="lb-img" src="" alt="" /></div>
+      <div class="lb-side" id="lb-side"></div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
